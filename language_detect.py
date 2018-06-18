@@ -24,7 +24,8 @@ class LanguageDetection:
 
     def load_words(self, file, language):
         self._sentences[language] = []
-        self._languages.append(language)
+        if language not in self._languages:
+            self._languages.append(language)
         exclude = set(string.punctuation)
         with open(file, 'r', encoding='utf-8') as input_file:
             for line in input_file:
@@ -79,8 +80,8 @@ class LanguageDetection:
 
     def _build_model(self):
         net = tflearn.input_data([None, self._max_document_size])
-        net = tflearn.embedding(net, input_dim=self._index_length, output_dim=256)
-        net = tflearn.lstm(net, 256, dropout=0.8)
+        net = tflearn.embedding(net, input_dim=self._index_length, output_dim=512)
+        net = tflearn.lstm(net, 512, dropout=0.8)
         net = tflearn.fully_connected(net, len(self._languages), activation='softmax')
         net = tflearn.regression(net, optimizer='adam', learning_rate=self._learning_rate,
                                  loss='categorical_crossentropy')
@@ -134,6 +135,12 @@ class LanguageDetection:
                 words_ids[idx] = word_id
         return words_ids
 
+    def __results_lang_pairs(self, langs, results):
+        return_value = []
+        for lang, result in enumerate(langs, results):
+            return_value.append((lang, '{:.2f}'.format(result)))
+        return return_value
+
     def predict(self, sentence):
         document_data = self._prepare_single_sentence(sentence)
         result = self.model.predict([document_data])[0]
@@ -141,17 +148,4 @@ class LanguageDetection:
         results = list(result)
         most_probable_index = results.index(most_probable)
         class_name = self._languages[most_probable_index]
-        return class_name, results
-
-
-if __name__ == '__main__':
-    w = LanguageDetection(vocab_size=5000)
-    #w.load_words('ru.txt', 'ru')
-    #w.load_words('bg.txt', 'bg')
-    #w.load_words('ua.txt', 'ua')
-    #w.load_words('mk.txt', 'mk')
-    #w.train_model(epochs=1)
-    #w.save_model('QuickExample')
-    w.load_model('QuickExample')
-    class_name, results = w.predict('Преспа ден пред потпишувањето на историскиот договор')
-    print(class_name, results)
+        return class_name, self.__results_lang_pairs(self._languages, results)
